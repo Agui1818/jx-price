@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1565c0">
+  <title>JX 价格查询</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:      #1565c0;
+      --accent-dark: #0d47a1;
+      --bg:          #eef2f7;
+      --card:        #ffffff;
+      --text:        #212121;
+      --text2:       #757575;
+      --price:       #c62828;
+      --price-none:  #9e9e9e;
+      --copy-btn:    #2e7d32;
+      --copy-ok:     #1b5e20;
+      --shadow:      0 2px 8px rgba(0,0,0,0.10);
+      --radius:      12px;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ─── Header ─── */
+    header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: linear-gradient(120deg, var(--accent-dark) 0%, var(--accent) 100%);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    .hd-title {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .hd-sub {
+      font-size: 12px;
+      opacity: 0.70;
+      margin-left: 9px;
+      margin-top: 2px;
+    }
+
+    /* ─── Page wrap ─── */
+    .wrap {
+      max-width: 600px;
+      margin: 0 auto;
+      padding-top: 56px; /* header height */
+    }
+
+    /* ─── Search bar ─── */
+    #search-wrap {
+      position: sticky;
+      top: 56px;
+      z-index: 90;
+      padding: 12px 14px 10px;
+      background: var(--bg);
+    }
+    #q {
+      width: 100%;
+      height: 52px;
+      font-size: 16px;        /* prevents iOS zoom */
+      padding: 0 22px;
+      border: none;
+      border-radius: 26px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      color: var(--text);
+      outline: none;
+      -webkit-appearance: none;
+    }
+    #q::placeholder        { color: #b0b0b0; }
+    #q::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+    /* ─── Results container ─── */
+    #results {
+      padding: 4px 14px 40px;
+    }
+
+    /* ─── Hint / empty state ─── */
+    .hint {
+      text-align: center;
+      color: var(--text2);
+      padding: 64px 24px 40px;
+    }
+    .hint-main { font-size: 16px; margin-bottom: 10px; }
+    .hint-sub  { font-size: 13px; line-height: 1.7; }
+
+    /* ─── Stats bar ─── */
+    #stats {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 2px 10px;
+    }
+    .stats-text { font-size: 13px; color: var(--text2); }
+
+    #copy-all-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      padding: 6px 18px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #copy-all-btn:active   { opacity: 0.80; }
+    #copy-all-btn.copied   { background: var(--copy-ok); }
+
+    /* ─── Result card ─── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 14px 16px 12px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-spec {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .card-spec mark {
+      background: #fff59d;
+      color: inherit;
+      border-radius: 3px;
+      padding: 0 2px;
+    }
+
+    .card-name {
+      font-size: 12px;
+      color: var(--text2);
+      margin: 3px 0 10px;
+    }
+
+    .card-row {
+      display: flex;
+      align-items: baseline;
+      margin-bottom: 5px;
+      gap: 6px;
+    }
+    .card-lbl {
+      font-size: 12px;
+      color: var(--text2);
+      flex-shrink: 0;
+      width: 52px;
+    }
+    .card-val {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.45;
+      word-break: break-all;
+    }
+
+    .card-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      gap: 10px;
+    }
+    .card-price {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--price);
+      line-height: 1;
+    }
+    .card-price.none {
+      font-size: 15px;
+      font-weight: 400;
+      color: var(--price-none);
+    }
+
+    .card-copy {
+      flex-shrink: 0;
+      background: var(--copy-btn);
+      color: #fff;
+      border: none;
+      border-radius: 22px;
+      padding: 10px 24px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .card-copy:active  { opacity: 0.80; }
+    .card-copy.copied  { background: var(--copy-ok); }
+
+    /* ─── "More results" hint ─── */
+    .more-hint {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text2);
+      padding: 8px 0 4px;
+    }
+
+    /* ─── Desktop: small adjustments ─── */
+    @media (min-width: 600px) {
+      .card-copy { padding: 10px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="hd-title">价格查询</span>
+  <span class="hd-sub">钜兴电子</span>
+  <nav style="margin-left:auto;display:flex;gap:6px">
+    <a href="orders.html"    style="color:rgba(255,255,255,.85);font-size:12px;text-decoration:none;padding:4px 9px;border-radius:12px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.2)'" onmouseout="this.style.background=''">订单</a>
+    <a href="customers.html" style="color:rgba(255,255,255,.85);font-size:12px;text-decoration:none;padding:4px 9px;border-radius:12px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.2)'" onmouseout="this.style.background=''">客户</a>
+    <a href="inventory.html" style="color:rgba(255,255,255,.85);font-size:12px;text-decoration:none;padding:4px 9px;border-radius:12px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.2)'" onmouseout="this.style.background=''">库存</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <div id="search-wrap">
+    <input id="q" type="search"
+           placeholder="输入规格型号，如 MB6F、ABS8…"
+           autocomplete="off"
+           autocorrect="off"
+           autocapitalize="characters"
+           spellcheck="false"
+           autofocus>
+  </div>
+
+  <main id="results">
+    <div class="hint">
+      <div class="hint-main">输入规格型号开始查询</div>
+      <div class="hint-sub">支持模糊搜索<br>例如输入 MB6 可查询所有 MB6 系列</div>
+    </div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script>
+/* ── field indexes in PRODUCTS array ── */
+const I_SKU   = 0;
+const I_NAME  = 1;
+const I_SPEC  = 2;
+const I_AUX   = 3;
+const I_BRAND = 4;
+const I_PRICE = 5;
+
+const MAX_RESULTS = 50;
+
+const inputEl  = document.getElementById('q');
+const resultsEl = document.getElementById('results');
+
+/* ── helpers ── */
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function highlight(text, q) {
+  const i = text.toUpperCase().indexOf(q.toUpperCase());
+  if (i === -1) return esc(text);
+  return esc(text.slice(0, i)) +
+         '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' +
+         esc(text.slice(i + q.length));
+}
+
+function fmtPrice(raw) {
+  if (!raw) return null;
+  const n = parseFloat(raw);
+  if (isNaN(n) || n <= 0) return null;
+  // Show up to 4 decimals, drop trailing zeros
+  return '¥' + n.toFixed(4).replace(/\.?0+$/, '');
+}
+
+function copyText(p) {
+  const priceStr = fmtPrice(p[I_PRICE]) || '待询价';
+  return '规格：' + p[I_SPEC] +
+    '\n辅助属性：' + p[I_AUX] +
+    '\n品牌：' + (p[I_BRAND] || '—') +
+    '\n最低售价：' + priceStr;
+}
+
+function doCopy(text, btn, origLabel) {
+  const ok = () => {
+    btn.textContent = '已复制 ✓';
+    btn.classList.add('copied');
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => {
+      btn.textContent = origLabel;
+      btn.classList.remove('copied');
+    }, 2000);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(ok).catch(() => fallback(text, ok));
+  } else {
+    fallback(text, ok);
+  }
+}
+
+function fallback(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try { document.execCommand('copy'); cb(); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+/* ── search ── */
+function runSearch(raw) {
+  const q = raw.trim();
+
+  if (q.length < 1) {
+    resultsEl.innerHTML =
+      '<div class="hint">' +
+        '<div class="hint-main">输入规格型号开始查询</div>' +
+        '<div class="hint-sub">支持模糊搜索<br>例如输入 MB6 可查询所有 MB6 系列</div>' +
+      '</div>';
+    return;
+  }
+
+  const qu = q.toUpperCase();
+  const exact = [], starts = [], rest = [];
+  let total = 0;
+
+  for (let i = 0; i < PRODUCTS.length; i++) {
+    const su = PRODUCTS[i][I_SPEC].toUpperCase();
+    if (su === qu)              { exact.push(PRODUCTS[i]); total++; }
+    else if (su.startsWith(qu)){ starts.push(PRODUCTS[i]); total++; }
+    else if (su.includes(qu))  { rest.push(PRODUCTS[i]);   total++; }
+  }
+
+  const matches = [...exact, ...starts, ...rest].slice(0, MAX_RESULTS);
+
+  if (matches.length === 0) {
+    resultsEl.innerHTML =
+      '<div class="hint">' +
+        '<div class="hint-main">未找到匹配的规格型号</div>' +
+        '<div class="hint-sub">请检查输入是否正确<br>或尝试更短的关键词</div>' +
+      '</div>';
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+
+  /* stats bar */
+  const statsDiv = document.createElement('div');
+  statsDiv.id = 'stats';
+
+  const statsTxt = document.createElement('span');
+  statsTxt.className = 'stats-text';
+  statsTxt.textContent = total > MAX_RESULTS
+    ? '结果过多，仅显示前 ' + MAX_RESULTS + ' 条'
+    : '共 ' + matches.length + ' 条结果';
+  statsDiv.appendChild(statsTxt);
+
+  if (matches.length > 1) {
+    const btn = document.createElement('button');
+    btn.id = 'copy-all-btn';
+    btn.textContent = '复制全部';
+    btn.addEventListener('click', function () {
+      doCopy(matches.map(copyText).join('\n\n'), this, '复制全部');
+    });
+    statsDiv.appendChild(btn);
+  }
+  frag.appendChild(statsDiv);
+
+  /* cards */
+  for (const p of matches) {
+    const priceStr = fmtPrice(p[I_PRICE]);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML =
+      '<div class="card-spec">' + highlight(p[I_SPEC], q) + '</div>' +
+      '<div class="card-name">' + esc(p[I_NAME]) + '</div>' +
+      '<div class="card-row">' +
+        '<span class="card-lbl">辅助属性</span>' +
+        '<span class="card-val">' + esc(p[I_AUX]) + '</span>' +
+      '</div>' +
+      '<div class="card-row">' +
+        '<span class="card-lbl">品牌</span>' +
+        '<span class="card-val">' + esc(p[I_BRAND] || '—') + '</span>' +
+      '</div>' +
+      '<div class="card-bottom">' +
+        '<span class="card-price' + (priceStr ? '' : ' none') + '">' +
+          (priceStr || '待询价') +
+        '</span>' +
+        '<button class="card-copy">复制</button>' +
+      '</div>';
+
+    card.querySelector('.card-copy').addEventListener('click', function () {
+      doCopy(copyText(p), this, '复制');
+    });
+
+    frag.appendChild(card);
+  }
+
+  if (total > MAX_RESULTS) {
+    const more = document.createElement('div');
+    more.className = 'more-hint';
+    more.textContent = '还有更多结果，请输入更完整的型号';
+    frag.appendChild(more);
+  }
+
+  resultsEl.innerHTML = '';
+  resultsEl.appendChild(frag);
+}
+
+/* ── event binding ── */
+let timer = null;
+inputEl.addEventListener('input', function () {
+  clearTimeout(timer);
+  timer = setTimeout(() => runSearch(this.value), 120);
+});
+</script>
+
+</body>
+</html>

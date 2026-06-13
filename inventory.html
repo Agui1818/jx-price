@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>库存看板 - JX 钜兴电子</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent: #1565c0; --accent-dark: #0d47a1; --bg: #eef2f7; --card: #fff;
+      --text: #212121; --text2: #757575; --green: #2e7d32; --red: #c62828;
+      --orange: #e65100; --shadow: 0 2px 8px rgba(0,0,0,.10); --radius: 12px;
+    }
+    html, body { min-height: 100%; background: var(--bg); color: var(--text);
+      font-family: -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif; }
+    header { position: fixed; top:0; left:0; right:0; height:56px;
+      background: linear-gradient(120deg,var(--accent-dark),var(--accent));
+      color:#fff; display:flex; align-items:center; padding:0 18px; z-index:200;
+      box-shadow:0 2px 8px rgba(0,0,0,.25); gap:12px; }
+    .hd-title { font-size:18px; font-weight:700; }
+    .hd-sub   { font-size:12px; opacity:.7; }
+    .hd-nav   { margin-left:auto; display:flex; gap:8px; }
+    .hd-nav a { color:rgba(255,255,255,.85); font-size:13px; text-decoration:none;
+      padding:5px 10px; border-radius:14px; transition:background .15s; }
+    .hd-nav a:hover { background:rgba(255,255,255,.2); }
+    .wrap { max-width:1100px; margin:0 auto; padding:70px 14px 50px; }
+
+    /* summary cards */
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px; }
+    @media(max-width:600px){ .stats-row{ grid-template-columns:repeat(2,1fr); } }
+    .stat-card { background:var(--card); border-radius:var(--radius); padding:16px;
+      box-shadow:var(--shadow); text-align:center; cursor:pointer; transition:transform .15s,box-shadow .15s; }
+    .stat-card:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,.13); }
+    .stat-card.active { outline:2px solid var(--accent); }
+    .stat-icon { font-size:28px; margin-bottom:6px; }
+    .stat-val  { font-size:26px; font-weight:700; }
+    .stat-lbl  { font-size:12px; color:var(--text2); margin-top:4px; }
+    .stat-card.shortage .stat-val  { color:var(--red); }
+    .stat-card.slowmove .stat-val  { color:var(--orange); }
+    .stat-card.total    .stat-val  { color:var(--accent); }
+    .stat-card.value    .stat-val  { color:var(--green); }
+
+    /* toolbar */
+    .toolbar { display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:16px; gap:10px; flex-wrap:wrap; }
+    .btn { height:40px; padding:0 18px; border:none; border-radius:20px; font-size:13px;
+      cursor:pointer; font-weight:600; transition:opacity .15s; white-space:nowrap; }
+    .btn:active { opacity:.8; }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-orange  { background:var(--orange); color:#fff; }
+    .btn-green   { background:var(--green); color:#fff; }
+    .btn-outline { background:#fff; color:var(--accent); border:1px solid var(--accent); }
+
+    /* charts grid */
+    .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+    @media(max-width:700px){ .charts-grid{ grid-template-columns:1fr; } }
+    .chart-card { background:var(--card); border-radius:var(--radius); padding:18px;
+      box-shadow:var(--shadow); }
+    .chart-title { font-size:15px; font-weight:700; margin-bottom:4px; }
+    .chart-hint  { font-size:12px; color:var(--text2); margin-bottom:14px; }
+    .chart-hint span { background:#e3f2fd; color:var(--accent); padding:2px 8px;
+      border-radius:10px; font-size:11px; font-weight:600; }
+    .chart-wrap { position:relative; height:260px; }
+
+    /* detail panel */
+    .detail-panel { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+      overflow:hidden; margin-bottom:20px; display:none; }
+    .detail-panel.open { display:block; }
+    .detail-header { display:flex; justify-content:space-between; align-items:center;
+      padding:14px 18px; background:#f5f7fa; border-bottom:1px solid #eee; }
+    .detail-header h3 { font-size:15px; font-weight:700; }
+    .detail-close { background:none; border:none; font-size:20px; cursor:pointer; color:var(--text2);
+      width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .detail-close:hover { background:#e0e0e0; }
+    .detail-table-wrap { overflow-x:auto; }
+    .detail-table { width:100%; border-collapse:collapse; font-size:13px; min-width:600px; }
+    .detail-table th { background:#e8eaf6; padding:8px 12px; text-align:left; font-weight:600;
+      position:sticky; top:0; }
+    .detail-table td { padding:8px 12px; border-top:1px solid #f0f0f0; }
+    .detail-table tr:hover td { background:#f5f8ff; }
+    .tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+    .tag-shortage  { background:#ffebee; color:var(--red); }
+    .tag-slow90    { background:#fff3e0; color:#e65100; }
+    .tag-slow180   { background:#fce4ec; color:#880e4f; }
+    .tag-slow365   { background:#f3e5f5; color:#6a1b9a; }
+    .tag-normal    { background:#e8f5e9; color:var(--green); }
+
+    /* add / import panel */
+    .add-panel { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+      padding:18px; margin-bottom:16px; display:none; }
+    .add-panel.open { display:block; }
+    .panel-title { font-size:15px; font-weight:700; margin-bottom:14px;
+      padding-bottom:8px; border-bottom:1px solid #eee; display:flex;
+      justify-content:space-between; align-items:center; }
+    .form-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+    @media(max-width:600px){ .form-row{ grid-template-columns:1fr 1fr; } }
+    .form-group label { display:block; font-size:12px; color:var(--text2); margin-bottom:4px; }
+    .form-group input, .form-group select {
+      width:100%; height:38px; font-size:13px; padding:0 10px; border:1px solid #ddd;
+      border-radius:8px; outline:none; color:var(--text); background:#fff; }
+    .form-group input:focus { border-color:var(--accent); }
+    .empty-chart { text-align:center; padding:40px; color:var(--text2); }
+    .empty-chart .empty-icon { font-size:40px; margin-bottom:8px; }
+
+    /* sample data notice */
+    .notice { background:#e3f2fd; border-radius:10px; padding:10px 16px; font-size:13px;
+      color:#0d47a1; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+    .notice-close { background:none; border:none; cursor:pointer; color:#0d47a1; font-size:18px;
+      margin-left:auto; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="hd-title">库存看板</span>
+  <span class="hd-sub">缺货 · 呆滞料</span>
+  <nav class="hd-nav">
+    <a href="index.html">价格查询</a>
+    <a href="orders.html">订单管理</a>
+    <a href="customers.html">客户管理</a>
+  </nav>
+</header>
+
+<div class="wrap">
+
+  <div class="notice" id="sample-notice">
+    💡 首次使用已加载示例数据，点击"添加库存"录入真实数据，或点击图表查看明细。
+    <button class="notice-close" onclick="document.getElementById('sample-notice').remove()">×</button>
+  </div>
+
+  <!-- stats -->
+  <div class="stats-row">
+    <div class="stat-card total"    onclick="showDetail('all')"     title="点击查看全部明细"><div class="stat-icon">📦</div><div class="stat-val" id="s-total">0</div><div class="stat-lbl">库存品种数</div></div>
+    <div class="stat-card shortage" onclick="showDetail('shortage')" title="点击查看缺货明细"><div class="stat-icon">🔴</div><div class="stat-val" id="s-short">0</div><div class="stat-lbl">缺货品种</div></div>
+    <div class="stat-card slowmove" onclick="showDetail('slow')"     title="点击查看呆滞明细"><div class="stat-icon">🟡</div><div class="stat-val" id="s-slow">0</div><div class="stat-lbl">呆滞品种</div></div>
+    <div class="stat-card value"    onclick="showDetail('all')"      title="点击查看全部明细"><div class="stat-icon">💰</div><div class="stat-val" id="s-val">¥0</div><div class="stat-lbl">呆滞库存价值</div></div>
+  </div>
+
+  <!-- toolbar -->
+  <div class="toolbar">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="toggleAddPanel()">＋ 添加库存</button>
+      <button class="btn btn-outline" onclick="loadSampleData()">载入示例数据</button>
+      <button class="btn btn-outline" id="clear-btn" onclick="clearData()" style="color:var(--red);border-color:var(--red)">清空数据</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2)">
+      <label>呆滞天数阈值：<input type="number" id="slow-days" value="90" min="1" max="999"
+        style="width:60px;height:30px;font-size:13px;padding:0 8px;border:1px solid #ddd;border-radius:6px;margin-left:4px;outline:none"
+        onchange="renderAll()"> 天</label>
+    </div>
+  </div>
+
+  <!-- add panel -->
+  <div class="add-panel" id="add-panel">
+    <div class="panel-title">
+      <span>添加库存记录</span>
+      <button class="btn btn-outline" style="height:32px;padding:0 12px;font-size:12px" onclick="toggleAddPanel()">收起</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>规格型号 *</label><input id="a-spec" placeholder="如 MB6F"></div>
+      <div class="form-group"><label>品牌</label><input id="a-brand" placeholder="如 WTE"></div>
+      <div class="form-group"><label>现有库存（件）*</label><input id="a-stock" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><label>安全库存（件）</label><input id="a-min" type="number" min="0" placeholder="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>单价（¥）</label><input id="a-price" type="number" min="0" step="0.0001" placeholder="0.0000"></div>
+      <div class="form-group"><label>最后出入库日期</label><input id="a-lastmove" type="date"></div>
+      <div class="form-group"><label>分类</label>
+        <select id="a-cat"><option>整流器件</option><option>三极管</option><option>二极管</option>
+          <option>稳压管</option><option>可控硅</option><option>模块</option><option>其他</option></select>
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-end">
+        <button class="btn btn-green" style="width:100%" onclick="addItem()">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">缺货品种分布</div>
+      <div class="chart-hint">按分类统计缺货品种数 &nbsp;<span>点击柱形查看明细</span></div>
+      <div class="chart-wrap"><canvas id="shortage-chart"></canvas>
+        <div class="empty-chart" id="shortage-empty" style="display:none">
+          <div class="empty-icon">✅</div>暂无缺货记录</div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">呆滞料库龄分布</div>
+      <div class="chart-hint">按库存积压时间分桶统计 &nbsp;<span>点击扇形查看明细</span></div>
+      <div class="chart-wrap"><canvas id="slow-chart"></canvas>
+        <div class="empty-chart" id="slow-empty" style="display:none">
+          <div class="empty-icon">✅</div>暂无呆滞记录</div></div>
+    </div>
+  </div>
+
+  <!-- detail panel (hidden, shown on chart click) -->
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-header">
+      <h3 id="detail-title">明细</h3>
+      <button class="detail-close" onclick="closeDetail()">×</button>
+    </div>
+    <div class="detail-table-wrap">
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th>规格型号</th><th>品牌</th><th>分类</th>
+            <th>现有库存</th><th>安全库存</th><th>缺口</th>
+            <th>单价</th><th>库存金额</th><th>最后移动</th><th>库龄(天)</th><th>状态</th>
+          </tr>
+        </thead>
+        <tbody id="detail-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const INV_KEY = 'jx_inventory';
+function loadInv() { try { return JSON.parse(localStorage.getItem(INV_KEY)) || []; } catch { return []; } }
+function saveInv(d) { localStorage.setItem(INV_KEY, JSON.stringify(d)); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function daysSince(dateStr) {
+  if (!dateStr) return 9999;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return 9999;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+
+function getStatus(item, slowDays) {
+  const shortage = (+item.stock || 0) < (+item.minStock || 0);
+  const slow = daysSince(item.lastMove) >= slowDays && (+item.stock || 0) > 0;
+  if (shortage && (+item.minStock || 0) > 0) return 'shortage';
+  if (slow) {
+    const d = daysSince(item.lastMove);
+    if (d >= 365) return 'slow365';
+    if (d >= 180) return 'slow180';
+    return 'slow90';
+  }
+  return 'normal';
+}
+
+const TAG = {
+  shortage: '<span class="tag tag-shortage">缺货</span>',
+  slow90:   '<span class="tag tag-slow90">呆滞 90天+</span>',
+  slow180:  '<span class="tag tag-slow180">呆滞 180天+</span>',
+  slow365:  '<span class="tag tag-slow365">呆滞 365天+</span>',
+  normal:   '<span class="tag tag-normal">正常</span>',
+};
+
+/* ── Charts ── */
+let shortageChart = null;
+let slowChart     = null;
+
+const CHART_COLORS = {
+  shortage: ['#ef5350','#e53935','#c62828','#b71c1c','#ef9a9a','#ffcdd2'],
+  slow: ['#ff9800','#f57c00','#e65100','#bf360c'],
+};
+
+function renderAll() {
+  const inv = loadInv();
+  const slowDays = +(document.getElementById('slow-days').value) || 90;
+
+  const shortageItems = inv.filter(it => getStatus(it, slowDays) === 'shortage');
+  const slowItems     = inv.filter(it => ['slow90','slow180','slow365'].includes(getStatus(it, slowDays)));
+
+  // Stats
+  document.getElementById('s-total').textContent = inv.length;
+  document.getElementById('s-short').textContent = shortageItems.length;
+  document.getElementById('s-slow').textContent  = slowItems.length;
+  const totalSlowVal = slowItems.reduce((s,it) => s + (+it.stock||0) * (+it.price||0), 0);
+  document.getElementById('s-val').textContent = '¥'+totalSlowVal.toLocaleString('zh-CN',{maximumFractionDigits:0});
+
+  renderShortageChart(shortageItems);
+  renderSlowChart(slowItems, slowDays);
+}
+
+function renderShortageChart(items) {
+  const ctx = document.getElementById('shortage-chart');
+  const emptyEl = document.getElementById('shortage-empty');
+
+  if (!items.length) {
+    ctx.style.display = 'none';
+    emptyEl.style.display = '';
+    if (shortageChart) { shortageChart.destroy(); shortageChart = null; }
+    return;
+  }
+  ctx.style.display = '';
+  emptyEl.style.display = 'none';
+
+  // Group by category
+  const catMap = {};
+  for (const it of items) {
+    const cat = it.category || '其他';
+    catMap[cat] = (catMap[cat] || 0) + 1;
+  }
+  const labels = Object.keys(catMap);
+  const data   = labels.map(l => catMap[l]);
+  const colors = labels.map((_, i) => CHART_COLORS.shortage[i % CHART_COLORS.shortage.length]);
+
+  if (shortageChart) shortageChart.destroy();
+  shortageChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: '缺货品种数', data, backgroundColor: colors,
+        borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} 个品种` } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1 },
+             title: { display: true, text: '品种数', font: { size: 11 } } },
+        x: { grid: { display: false } }
+      },
+      onClick(evt, elements) {
+        if (!elements.length) return;
+        const cat = labels[elements[0].index];
+        const slowDays = +(document.getElementById('slow-days').value)||90;
+        const inv = loadInv();
+        const filtered = inv.filter(it => (it.category||'其他') === cat && getStatus(it, slowDays) === 'shortage');
+        showDetailTable('缺货明细 — ' + cat, filtered);
+      }
+    }
+  });
+}
+
+function renderSlowChart(items, slowDays) {
+  const ctx = document.getElementById('slow-chart');
+  const emptyEl = document.getElementById('slow-empty');
+
+  if (!items.length) {
+    ctx.style.display = 'none';
+    emptyEl.style.display = '';
+    if (slowChart) { slowChart.destroy(); slowChart = null; }
+    return;
+  }
+  ctx.style.display = '';
+  emptyEl.style.display = 'none';
+
+  const buckets = { [`${slowDays}~180天`]: 0, '180~365天': 0, '365天以上': 0 };
+  for (const it of items) {
+    const d = daysSince(it.lastMove);
+    if      (d >= 365) buckets['365天以上']++;
+    else if (d >= 180) buckets['180~365天']++;
+    else               buckets[`${slowDays}~180天`]++;
+  }
+  const labels = Object.keys(buckets).filter(k => buckets[k] > 0);
+  const data   = labels.map(l => buckets[l]);
+  const colPalette = ['#ff9800','#f57c00','#bf360c'];
+
+  if (slowChart) slowChart.destroy();
+  slowChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colPalette.slice(0, labels.length),
+        borderWidth: 2, borderColor: '#fff', hoverOffset: 8 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed} 个品种` } }
+      },
+      onClick(evt, elements) {
+        if (!elements.length) return;
+        const label = labels[elements[0].index];
+        const inv = loadInv();
+        const filtered = inv.filter(it => {
+          const d = daysSince(it.lastMove);
+          const sl = +(document.getElementById('slow-days').value)||90;
+          if (label.startsWith('365')) return d >= 365 && +it.stock > 0;
+          if (label.startsWith('180')) return d >= 180 && d < 365 && +it.stock > 0;
+          return d >= sl && d < 180 && +it.stock > 0;
+        });
+        showDetailTable('呆滞明细 — ' + label, filtered);
+      }
+    }
+  });
+}
+
+/* ── Detail panel ── */
+function showDetailTable(title, items) {
+  const slowDays = +(document.getElementById('slow-days').value)||90;
+  document.getElementById('detail-title').textContent = title + '（共 ' + items.length + ' 条）';
+  const rows = items.map(it => {
+    const stock   = +it.stock || 0;
+    const minStock= +it.minStock || 0;
+    const price   = +it.price || 0;
+    const gap     = minStock > stock ? minStock - stock : 0;
+    const val     = (stock * price).toFixed(2);
+    const d       = daysSince(it.lastMove);
+    const st      = getStatus(it, slowDays);
+    return `<tr>
+      <td style="font-weight:700">${esc(it.spec||'')}</td>
+      <td>${esc(it.brand||'')}</td>
+      <td>${esc(it.category||'')}</td>
+      <td style="text-align:right">${stock.toLocaleString()}</td>
+      <td style="text-align:right">${minStock ? minStock.toLocaleString() : '—'}</td>
+      <td style="text-align:right;color:var(--red);font-weight:${gap?700:400}">${gap ? gap.toLocaleString() : '—'}</td>
+      <td style="text-align:right">${price ? '¥'+price.toFixed(4).replace(/\.?0+$/,'') : '—'}</td>
+      <td style="text-align:right;color:var(--green)">${price&&stock ? '¥'+val : '—'}</td>
+      <td>${esc(it.lastMove||'—')}</td>
+      <td style="text-align:right">${d < 9999 ? d : '—'}</td>
+      <td>${TAG[st]||''}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('detail-tbody').innerHTML = rows || '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text2)">暂无数据</td></tr>';
+  const panel = document.getElementById('detail-panel');
+  panel.classList.add('open');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showDetail(type) {
+  const inv = loadInv();
+  const slowDays = +(document.getElementById('slow-days').value)||90;
+  let items, title;
+  if (type === 'shortage') { items = inv.filter(it => getStatus(it, slowDays) === 'shortage'); title = '缺货明细'; }
+  else if (type === 'slow'){ items = inv.filter(it => ['slow90','slow180','slow365'].includes(getStatus(it, slowDays))); title = '呆滞料明细'; }
+  else { items = inv; title = '全部库存明细'; }
+  showDetailTable(title, items);
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+}
+
+/* ── Add item ── */
+function toggleAddPanel() {
+  const p = document.getElementById('add-panel');
+  p.classList.toggle('open');
+  if (p.classList.contains('open')) {
+    document.getElementById('a-lastmove').value = new Date().toISOString().slice(0,10);
+    document.getElementById('a-spec').focus();
+  }
+}
+
+function addItem() {
+  const spec = document.getElementById('a-spec').value.trim();
+  if (!spec) { alert('请填写规格型号'); return; }
+  const stock = +(document.getElementById('a-stock').value) || 0;
+  const inv = loadInv();
+  inv.push({
+    spec,
+    brand:    document.getElementById('a-brand').value.trim(),
+    stock,
+    minStock: +(document.getElementById('a-min').value) || 0,
+    price:    +(document.getElementById('a-price').value) || 0,
+    lastMove: document.getElementById('a-lastmove').value,
+    category: document.getElementById('a-cat').value,
+  });
+  saveInv(inv);
+  // reset form
+  ['a-spec','a-brand','a-stock','a-min','a-price'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('a-lastmove').value = new Date().toISOString().slice(0,10);
+  renderAll();
+  closeDetail();
+}
+
+/* ── Sample data ── */
+function loadSampleData() {
+  const today = new Date();
+  function daysAgo(n) {
+    const d = new Date(today); d.setDate(d.getDate()-n);
+    return d.toISOString().slice(0,10);
+  }
+  const sample = [
+    { spec:'MB6F',  brand:'WTE',  stock:0,   minStock:500, price:0.45,  lastMove:daysAgo(5),   category:'整流器件' },
+    { spec:'MB10F', brand:'WTE',  stock:0,   minStock:300, price:0.55,  lastMove:daysAgo(10),  category:'整流器件' },
+    { spec:'KBP206',brand:'HVR',  stock:50,  minStock:200, price:1.20,  lastMove:daysAgo(8),   category:'整流器件' },
+    { spec:'1N4007',brand:'ST',   stock:2000,minStock:5000,price:0.08,  lastMove:daysAgo(3),   category:'二极管' },
+    { spec:'IN5819', brand:'LRC', stock:0,   minStock:1000,price:0.12,  lastMove:daysAgo(15),  category:'二极管' },
+    { spec:'S8050',  brand:'UTC', stock:1500,minStock:0,   price:0.10,  lastMove:daysAgo(120), category:'三极管' },
+    { spec:'S8550',  brand:'UTC', stock:800, minStock:0,   price:0.10,  lastMove:daysAgo(200), category:'三极管' },
+    { spec:'BC547',  brand:'FS',  stock:300, minStock:0,   price:0.18,  lastMove:daysAgo(95),  category:'三极管' },
+    { spec:'2SC1815',brand:'TO',  stock:600, minStock:0,   price:0.22,  lastMove:daysAgo(400), category:'三极管' },
+    { spec:'LM7805', brand:'ST',  stock:0,   minStock:100, price:0.85,  lastMove:daysAgo(20),  category:'稳压管' },
+    { spec:'LM7812', brand:'ST',  stock:0,   minStock:100, price:0.90,  lastMove:daysAgo(12),  category:'稳压管' },
+    { spec:'LM317T', brand:'LRC', stock:450, minStock:0,   price:1.20,  lastMove:daysAgo(180), category:'稳压管' },
+    { spec:'MCR100-6',brand:'ON', stock:200, minStock:0,   price:0.65,  lastMove:daysAgo(380), category:'可控硅' },
+    { spec:'BT136',  brand:'PH',  stock:150, minStock:0,   price:1.80,  lastMove:daysAgo(270), category:'可控硅' },
+    { spec:'SKB25/04',brand:'SK', stock:0,   minStock:50,  price:8.50,  lastMove:daysAgo(30),  category:'模块' },
+    { spec:'KBPC2510',brand:'HVR',stock:80,  minStock:0,   price:3.20,  lastMove:daysAgo(110), category:'模块' },
+    { spec:'1N5408', brand:'ST',  stock:3000,minStock:2000,price:0.15,  lastMove:daysAgo(2),   category:'二极管' },
+    { spec:'FR107',  brand:'TL',  stock:500, minStock:500, price:0.20,  lastMove:daysAgo(150), category:'二极管' },
+    { spec:'UF4007', brand:'TL',  stock:0,   minStock:500, price:0.18,  lastMove:daysAgo(7),   category:'二极管' },
+    { spec:'2N5551', brand:'TO',  stock:700, minStock:0,   price:0.30,  lastMove:daysAgo(210), category:'三极管' },
+  ];
+  saveInv(sample);
+  renderAll();
+  closeDetail();
+  document.getElementById('sample-notice') && document.getElementById('sample-notice').remove();
+}
+
+function clearData() {
+  if (!confirm('确定清空所有库存数据？')) return;
+  saveInv([]);
+  renderAll();
+  closeDetail();
+}
+
+/* ── Init ── */
+const existing = loadInv();
+if (!existing.length) loadSampleData();
+else {
+  renderAll();
+  document.getElementById('sample-notice') && document.getElementById('sample-notice').remove();
+}
+</script>
+</body>
+</html>

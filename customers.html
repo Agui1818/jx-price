@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>客户管理 - JX 钜兴电子</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent: #1565c0; --accent-dark: #0d47a1; --bg: #eef2f7; --card: #fff;
+      --text: #212121; --text2: #757575; --green: #2e7d32; --red: #c62828;
+      --shadow: 0 2px 8px rgba(0,0,0,.10); --radius: 12px;
+    }
+    html, body { min-height: 100%; background: var(--bg); color: var(--text);
+      font-family: -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif; }
+    header { position: fixed; top:0; left:0; right:0; height:56px;
+      background: linear-gradient(120deg,var(--accent-dark),var(--accent));
+      color:#fff; display:flex; align-items:center; padding:0 18px; z-index:200;
+      box-shadow:0 2px 8px rgba(0,0,0,.25); gap:12px; }
+    .hd-title { font-size:18px; font-weight:700; }
+    .hd-sub   { font-size:12px; opacity:.7; }
+    .hd-nav   { margin-left:auto; display:flex; gap:8px; }
+    .hd-nav a { color:rgba(255,255,255,.85); font-size:13px; text-decoration:none;
+      padding:5px 10px; border-radius:14px; transition:background .15s; }
+    .hd-nav a:hover { background:rgba(255,255,255,.2); }
+
+    .wrap { max-width:900px; margin:0 auto; padding:70px 14px 50px; }
+
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+    @media(max-width:600px){ .stats-row{ grid-template-columns:repeat(2,1fr); } }
+    .stat-card { background:var(--card); border-radius:var(--radius); padding:14px 16px;
+      box-shadow:var(--shadow); text-align:center; }
+    .stat-val { font-size:26px; font-weight:700; color:var(--accent); }
+    .stat-lbl { font-size:12px; color:var(--text2); margin-top:4px; }
+
+    .toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:10px; flex-wrap:wrap; }
+    .toolbar-left { display:flex; gap:8px; align-items:center; flex:1; min-width:0; }
+    #search-cust { height:40px; font-size:14px; padding:0 14px; border:1px solid #ddd;
+      border-radius:20px; outline:none; width:100%; max-width:260px; background:#fff; }
+    #search-cust:focus { border-color:var(--accent); }
+    .btn { height:40px; padding:0 20px; border:none; border-radius:20px; font-size:14px;
+      cursor:pointer; font-weight:600; transition:opacity .15s; white-space:nowrap; }
+    .btn:active { opacity:.8; }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-outline { background:#fff; color:var(--accent); border:1px solid var(--accent); }
+
+    .section-card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+    .list-header { display:grid; grid-template-columns:1fr 1fr 120px 100px 80px; gap:8px;
+      padding:10px 14px; background:#f5f7fa; font-size:12px; color:var(--text2); font-weight:600; }
+    @media(max-width:600px){ .list-header{ display:none; } }
+    .cust-row { display:grid; grid-template-columns:1fr 1fr 120px 100px 80px; gap:8px;
+      padding:12px 14px; border-top:1px solid #f0f0f0; align-items:center; cursor:pointer;
+      transition:background .15s; font-size:14px; }
+    .cust-row:hover { background:#f5f8ff; }
+    @media(max-width:600px){ .cust-row{ grid-template-columns:1fr 1fr; grid-template-rows:auto auto; } }
+    .avatar { width:34px; height:34px; border-radius:50%; background:var(--accent);
+      color:#fff; display:inline-flex; align-items:center; justify-content:center;
+      font-size:14px; font-weight:700; flex-shrink:0; }
+    .name-cell { display:flex; align-items:center; gap:10px; }
+    .empty-state { text-align:center; padding:60px 24px; color:var(--text2); }
+    .empty-icon { font-size:48px; margin-bottom:12px; }
+
+    /* expand detail */
+    .cust-detail { display:none; background:#fafbff; border-top:1px solid #e8eaf6; padding:16px; }
+    .cust-detail.open { display:block; }
+    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:12px; }
+    @media(max-width:500px){ .detail-grid{ grid-template-columns:1fr; } }
+    .detail-group h4 { font-size:13px; color:var(--accent); margin-bottom:8px;
+      border-bottom:1px solid #e0e7ff; padding-bottom:4px; }
+    .detail-row { display:flex; gap:6px; font-size:13px; margin-bottom:5px; }
+    .detail-lbl { color:var(--text2); min-width:56px; flex-shrink:0; }
+    .orders-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:4px; }
+    .orders-table th { background:#e8eaf6; padding:6px 10px; text-align:left; font-weight:600; }
+    .orders-table td { padding:6px 10px; border-top:1px solid #f0f0f0; }
+    .detail-actions { display:flex; gap:8px; margin-top:12px; justify-content:flex-end; }
+    .btn-sm { height:32px; padding:0 14px; font-size:13px; border:none; border-radius:16px; cursor:pointer; font-weight:600; }
+    .btn-sm-primary { background:var(--accent); color:#fff; }
+    .btn-sm-red     { background:var(--red); color:#fff; }
+    .status-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600; }
+    .status-pending   { background:#fff3e0; color:#e65100; }
+    .status-done      { background:#e8f5e9; color:var(--green); }
+    .status-cancelled { background:#ffebee; color:var(--red); }
+
+    /* modal */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
+      z-index:300; align-items:center; justify-content:center; padding:16px; }
+    .modal-bg.open { display:flex; }
+    .modal { background:#fff; border-radius:16px; width:100%; max-width:480px;
+      max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.2); }
+    .modal-header { padding:18px 20px 14px; border-bottom:1px solid #eee; display:flex;
+      justify-content:space-between; align-items:center; }
+    .modal-header h2 { font-size:17px; }
+    .modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--text2);
+      width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .modal-close:hover { background:#f0f0f0; }
+    .modal-body { padding:18px 20px; }
+    .modal-footer { padding:14px 20px; border-top:1px solid #eee; display:flex; justify-content:flex-end; gap:10px; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px; }
+    @media(max-width:400px){ .form-row{ grid-template-columns:1fr; } }
+    .form-full { margin-bottom:10px; }
+    .form-group label { display:block; font-size:12px; color:var(--text2); margin-bottom:4px; }
+    .form-group input, .form-group textarea {
+      width:100%; height:40px; font-size:14px; padding:0 12px; border:1px solid #ddd;
+      border-radius:8px; outline:none; color:var(--text); background:#fff; }
+    .form-group textarea { height:70px; padding:8px 12px; resize:vertical; }
+    .form-group input:focus { border-color:var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="hd-title">客户管理</span>
+  <span class="hd-sub">钜兴电子</span>
+  <nav class="hd-nav">
+    <a href="index.html">价格查询</a>
+    <a href="orders.html">订单管理</a>
+    <a href="inventory.html">库存看板</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" id="s-total">0</div><div class="stat-lbl">总客户数</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-new">0</div><div class="stat-lbl">本月新增</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-orders">0</div><div class="stat-lbl">关联订单</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-amount">¥0</div><div class="stat-lbl">累计消费</div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <input type="search" id="search-cust" placeholder="搜索姓名、公司、电话…">
+    </div>
+    <button class="btn btn-primary" id="add-cust-btn">＋ 新增客户</button>
+  </div>
+
+  <div class="section-card">
+    <div class="list-header">
+      <span>客户</span><span>公司</span><span>电话</span><span>创建时间</span><span>订单数</span>
+    </div>
+    <div id="cust-list">
+      <div class="empty-state"><div class="empty-icon">👥</div>暂无客户<br>
+      <small>可从<a href="orders.html" style="color:var(--accent)">订单管理</a>中新建订单时自动创建，或手动添加</small></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-bg" id="cust-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">新增客户</h2>
+      <button class="modal-close" id="modal-close-btn">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>姓名 *</label><input id="f-name" placeholder="联系人姓名"></div>
+        <div class="form-group"><label>公司名称</label><input id="f-company" placeholder="公司/单位"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>联系电话</label><input id="f-phone" type="tel" placeholder="手机/电话"></div>
+        <div class="form-group"><label>微信/QQ</label><input id="f-wechat" placeholder="微信号或QQ"></div>
+      </div>
+      <div class="form-full form-group"><label>地址</label><input id="f-address" placeholder="联系地址"></div>
+      <div class="form-full form-group"><label>备注</label><textarea id="f-note" placeholder="客户备注…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="modal-cancel-btn">取消</button>
+      <button class="btn btn-primary" id="modal-save-btn">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CUSTOMERS_KEY = 'jx_customers';
+const ORDERS_KEY    = 'jx_orders';
+
+function loadCustomers() { try { return JSON.parse(localStorage.getItem(CUSTOMERS_KEY)) || []; } catch { return []; } }
+function saveCustomers(d){ localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(d)); }
+function loadOrders()    { try { return JSON.parse(localStorage.getItem(ORDERS_KEY)) || []; } catch { return []; } }
+function genId(p) { return p+'-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,5).toUpperCase(); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function getAvatarColor(name) {
+  const colors = ['#1565c0','#2e7d32','#c62828','#6a1b9a','#00838f','#ef6c00','#37474f'];
+  let h = 0;
+  for (let i=0; i<name.length; i++) h = (h*31 + name.charCodeAt(i)) & 0xfffffff;
+  return colors[h % colors.length];
+}
+
+/* Compute stats from orders for each customer */
+function buildCustStats() {
+  const orders = loadOrders();
+  const map = {};
+  for (const o of orders) {
+    const name = o.customer?.name;
+    const phone = o.customer?.phone;
+    const key = phone || name;
+    if (!key) continue;
+    if (!map[key]) map[key] = { count: 0, total: 0 };
+    map[key].count++;
+    map[key].total += o.total || 0;
+  }
+  return map;
+}
+
+function renderStats() {
+  const customers = loadCustomers();
+  const orders    = loadOrders();
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const newCount = customers.filter(c => (c.created||'').startsWith(thisMonth)).length;
+  document.getElementById('s-total').textContent  = customers.length;
+  document.getElementById('s-new').textContent    = newCount;
+  document.getElementById('s-orders').textContent = orders.length;
+  const total = orders.reduce((s,o) => s+(o.total||0), 0);
+  document.getElementById('s-amount').textContent = '¥'+total.toLocaleString('zh-CN',{maximumFractionDigits:2});
+}
+
+let openRow = null;
+
+function renderCustomers(filter = '') {
+  const customers = loadCustomers();
+  const custStats = buildCustStats();
+  const fu = filter.toUpperCase();
+  const list = fu
+    ? customers.filter(c =>
+        (c.name||'').toUpperCase().includes(fu) ||
+        (c.company||'').toUpperCase().includes(fu) ||
+        (c.phone||'').includes(fu))
+    : customers;
+
+  const container = document.getElementById('cust-list');
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>暂无匹配客户</div>';
+    return;
+  }
+
+  const orders = loadOrders();
+  const statusMap = { pending:'待处理', done:'已完成', cancelled:'已取消' };
+  const statusClass = { pending:'status-pending', done:'status-done', cancelled:'status-cancelled' };
+
+  container.innerHTML = [...list].reverse().map(c => {
+    const key = c.phone || c.name;
+    const stats = custStats[key] || { count:0, total:0 };
+    const initial = (c.name||'?').charAt(0);
+    const bg = getAvatarColor(c.name||'?');
+    const custOrders = orders.filter(o =>
+      (c.phone && o.customer?.phone === c.phone) ||
+      (!c.phone && o.customer?.name === c.name));
+    const orderRows = custOrders.length
+      ? [...custOrders].reverse().slice(0,10).map(o =>
+          `<tr>
+            <td><a href="orders.html" style="color:var(--accent)">${esc(o.id)}</a></td>
+            <td>${esc(o.date||'')}</td>
+            <td>${(o.items||[]).length} 项</td>
+            <td style="font-weight:700;color:var(--red)">¥${(o.total||0).toFixed(2)}</td>
+            <td><span class="status-badge ${statusClass[o.status]||'status-pending'}">${statusMap[o.status]||'待处理'}</span></td>
+          </tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:16px">暂无订单记录</td></tr>';
+    return `
+    <div class="cust-row" onclick="toggleDetail('${esc(c.id)}')">
+      <div class="name-cell">
+        <div class="avatar" style="background:${bg}">${esc(initial)}</div>
+        <span>${esc(c.name||'—')}</span>
+      </div>
+      <span style="font-size:13px;color:var(--text2)">${esc(c.company||'—')}</span>
+      <span style="font-size:13px">${esc(c.phone||'—')}</span>
+      <span style="font-size:13px;color:var(--text2)">${esc(c.created||'—')}</span>
+      <span style="font-weight:700;color:var(--accent)">${stats.count}</span>
+    </div>
+    <div class="cust-detail" id="detail-${esc(c.id)}">
+      <div class="detail-grid">
+        <div class="detail-group">
+          <h4>👤 基本信息</h4>
+          <div class="detail-row"><span class="detail-lbl">姓名</span><span>${esc(c.name||'—')}</span></div>
+          <div class="detail-row"><span class="detail-lbl">公司</span><span>${esc(c.company||'—')}</span></div>
+          <div class="detail-row"><span class="detail-lbl">电话</span><span>${esc(c.phone||'—')}</span></div>
+          <div class="detail-row"><span class="detail-lbl">微信</span><span>${esc(c.wechat||'—')}</span></div>
+          <div class="detail-row"><span class="detail-lbl">地址</span><span>${esc(c.address||'—')}</span></div>
+          <div class="detail-row"><span class="detail-lbl">备注</span><span>${esc(c.note||'—')}</span></div>
+        </div>
+        <div class="detail-group">
+          <h4>📊 消费统计</h4>
+          <div class="detail-row"><span class="detail-lbl">订单数</span><span style="font-weight:700">${stats.count}</span></div>
+          <div class="detail-row"><span class="detail-lbl">累计金额</span><span style="font-weight:700;color:var(--red)">¥${stats.total.toFixed(2)}</span></div>
+          <div class="detail-row"><span class="detail-lbl">创建时间</span><span>${esc(c.created||'—')}</span></div>
+          <div class="detail-row"><span class="detail-lbl">更新时间</span><span>${esc(c.updated||'—')}</span></div>
+        </div>
+      </div>
+      <h4 style="font-size:13px;color:var(--accent);margin-bottom:6px">📋 历史订单（最近10条）</h4>
+      <table class="orders-table">
+        <thead><tr><th>订单号</th><th>日期</th><th>明细</th><th>金额</th><th>状态</th></tr></thead>
+        <tbody>${orderRows}</tbody>
+      </table>
+      <div class="detail-actions">
+        <button class="btn-sm btn-sm-primary" onclick="editCust('${esc(c.id)}');event.stopPropagation()">编辑</button>
+        <button class="btn-sm btn-sm-red" onclick="deleteCust('${esc(c.id)}');event.stopPropagation()">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+  renderStats();
+}
+
+function toggleDetail(id) {
+  const el = document.getElementById('detail-' + id);
+  if (!el) return;
+  if (openRow && openRow !== id) {
+    const prev = document.getElementById('detail-' + openRow);
+    if (prev) prev.classList.remove('open');
+  }
+  el.classList.toggle('open');
+  openRow = el.classList.contains('open') ? id : null;
+}
+
+function deleteCust(id) {
+  if (!confirm('确定删除此客户？')) return;
+  saveCustomers(loadCustomers().filter(c => c.id !== id));
+  renderCustomers(document.getElementById('search-cust').value);
+}
+
+/* modal */
+let editingId = null;
+
+function openModal(cust = null) {
+  editingId = cust ? cust.id : null;
+  document.getElementById('modal-title').textContent = cust ? '编辑客户' : '新增客户';
+  document.getElementById('f-name').value    = cust?.name    || '';
+  document.getElementById('f-company').value = cust?.company || '';
+  document.getElementById('f-phone').value   = cust?.phone   || '';
+  document.getElementById('f-wechat').value  = cust?.wechat  || '';
+  document.getElementById('f-address').value = cust?.address || '';
+  document.getElementById('f-note').value    = cust?.note    || '';
+  document.getElementById('cust-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('cust-modal').classList.remove('open'); }
+
+document.getElementById('add-cust-btn').addEventListener('click', () => openModal());
+document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+
+function editCust(id) {
+  const c = loadCustomers().find(c => c.id === id);
+  if (c) openModal(c);
+}
+
+document.getElementById('modal-save-btn').addEventListener('click', () => {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { alert('请填写客户姓名'); return; }
+  const customers = loadCustomers();
+  const today = new Date().toISOString().slice(0,10);
+  if (editingId) {
+    const idx = customers.findIndex(c => c.id === editingId);
+    if (idx >= 0) {
+      customers[idx] = { ...customers[idx],
+        name, company: document.getElementById('f-company').value.trim(),
+        phone: document.getElementById('f-phone').value.trim(),
+        wechat: document.getElementById('f-wechat').value.trim(),
+        address: document.getElementById('f-address').value.trim(),
+        note: document.getElementById('f-note').value.trim(),
+        updated: today };
+    }
+  } else {
+    customers.push({
+      id: 'CUST-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,5).toUpperCase(),
+      name, company: document.getElementById('f-company').value.trim(),
+      phone: document.getElementById('f-phone').value.trim(),
+      wechat: document.getElementById('f-wechat').value.trim(),
+      address: document.getElementById('f-address').value.trim(),
+      note: document.getElementById('f-note').value.trim(),
+      created: today, updated: today });
+  }
+  saveCustomers(customers);
+  closeModal();
+  renderCustomers(document.getElementById('search-cust').value);
+});
+
+document.getElementById('search-cust').addEventListener('input', function() {
+  renderCustomers(this.value);
+});
+
+renderCustomers();
+renderStats();
+</script>
+</body>
+</html>
