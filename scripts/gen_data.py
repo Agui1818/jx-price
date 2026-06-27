@@ -12,7 +12,7 @@ from datetime import date
 
 ROOT = pathlib.Path(__file__).parent.parent
 OUTPUT_PATH = ROOT / "data.js"
-SHEET_NAME = "货品资料管理"
+SHEET_NAME = "货品基础资料P"
 
 # Auto-detect xlsx file: prefer 货品基础资料.xlsx, fall back to first .xlsx found
 preferred = ROOT / "货品基础资料.xlsx"
@@ -32,12 +32,12 @@ rows = []
 for i, row in enumerate(ws.iter_rows(values_only=True)):
     if i == 0:  # skip header
         continue
-    sku   = str(row[0]).strip() if row[0] is not None else ""
-    name  = str(row[1]).strip() if row[1] is not None else ""
+    sku   = str(row[5]).strip() if row[5] is not None else ""
+    name  = str(row[0]).strip() if row[0] is not None else ""
     spec  = str(row[2]).strip() if row[2] is not None else ""
     aux   = str(row[3]).strip() if row[3] is not None else ""
-    brand = str(row[6]).strip() if row[6] is not None else ""
-    price = row[7]
+    brand = str(row[1]).strip() if row[1] is not None else ""
+    price = row[4]
 
     if not sku:
         continue
